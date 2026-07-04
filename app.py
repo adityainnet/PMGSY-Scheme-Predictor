@@ -1,0 +1,128 @@
+"""
+PMGSY Scheme Predictor - Main Application
+
+A Streamlit application for predicting PMGSY (Pradhan Mantri Gram Sadak Yojana) 
+scheme classification using IBM Cloud Machine Learning.
+
+Usage:
+    streamlit run app.py
+"""
+
+import streamlit as st
+
+# Configure page - must be first Streamlit command
+st.set_page_config(
+    page_title="PMGSY Scheme Predictor",
+    page_icon="🛣️",
+    layout="wide"
+)
+
+# Import modules after page config
+from src.config import config
+from src.data import DataLoader
+
+# Model selection - switch between online (IBM Cloud) and offline (XGBoost)
+if config.USE_OFFLINE_MODEL:
+    from models import OfflinePredictor
+    from models.offline_predictor import get_confidence_level
+    ModelClient = OfflinePredictor
+else:
+    from src.api import IBMCloudClient
+    from src.api.ibm_client import get_confidence_level
+    ModelClient = IBMCloudClient
+from src.ui import (
+    apply_styles,
+    render_header,
+    render_stats,
+    render_input_form,
+    render_result,
+    render_dataset_insights
+)
+from src.ui.components import render_model_metrics
+from src.ui.charts import render_gauge_chart, render_probability_chart
+
+
+def init_session_state():
+    """Initialize Streamlit session state variables."""
+    if 'prediction_count' not in st.session_state:
+        st.session_state.prediction_count = 0
+
+
+def main():
+    """Main application entry point."""
+    
+    # Initialize
+    init_session_state()
+    apply_styles()
+    
+    # Load data
+    data_loader = DataLoader(config.DATA_PATH)
+    stats = data_loader.get_statistics()
+    states = data_loader.get_states()
+    
+    # Render UI components
+    render_header()
+    render_stats(stats, st.session_state.prediction_count)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    render_model_metrics()
+    render_dataset_insights(data_loader)
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Input form
+    form_data = render_input_form(states, data_loader.get_districts)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Predict button
+    if st.button("🔮 Predict Scheme", width='stretch'):
+        with st.spinner('🤖  Running AI model inference…'):
+            
+            # Create prediction client (cloud or offline based on config)
+            client = ModelClient()
+            
+            try:
+                prediction, probabilities, max_confidence = client.predict_scheme(
+                    state=form_data["state"],
+                    district=form_data["district"],
+                    road_sanctioned=form_data["road_sanctioned"],
+                    length_sanctioned=form_data["length_sanctioned"],
+                    bridges_sanctioned=form_data["bridges_sanctioned"],
+                    cost_sanctioned=form_data["cost_sanctioned"],
+                    road_completed=form_data["road_completed"],
+                    length_completed=form_data["length_completed"],
+                    bridges_completed=form_data["bridges_completed"],
+                    expenditure=form_data["expenditure"],
+                    road_balance=form_data["road_balance"],
+                    length_balance=form_data["length_balance"],
+                    bridges_balance=form_data["bridges_balance"]
+                )
+                
+                # Increment prediction counter
+                st.session_state.prediction_count += 1
+                
+                # Get confidence level styling
+                conf_level, conf_class = get_confidence_level(max_confidence)
+                
+                # Render results
+                st.markdown("<br>", unsafe_allow_html=True)
+                render_result(prediction, max_confidence * 100, conf_class)
+                render_gauge_chart(max_confidence * 100)
+                render_probability_chart(probabilities, max_confidence)
+                
+            except Exception as e:
+                st.error(f"Prediction failed: {str(e)}")
+                st.info("Please check your IBM Cloud credentials and try again.")
+
+    # Footer
+    st.markdown('<div class="styled-divider"></div>', unsafe_allow_html=True)
+    st.markdown("""
+        <div class="app-footer">
+            PMGSY Scheme Predictor &nbsp;·&nbsp; Powered by IBM Cloud ML &nbsp;·&nbsp;
+            Built with ❤️ for rural road infrastructure classification By Aditya
+        </div>
+    """, unsafe_allow_html=True)
+
+
+if __name__ == "__main__":
+    main()
