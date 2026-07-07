@@ -1,0 +1,19 @@
+{
+  "name": "PMGSY Scheme Predictor",
+  "description": "AI-powered PMGSY Scheme Classification using IBM AutoAI and watsonx.ai",
+  "version": "1.0.0",
+  "author": "Aditya Kumar",
+  "main": "app.py",
+  "platform": "IBM Cloud Lite",
+  "framework": "Streamlit",
+  "language": "Python",
+  "problem_statement": "Intelligent Classification of Rural Infrastructure Projects",
+  "technology": [
+    "IBM AutoAI",
+    "IBM watsonx.ai",
+    "IBM Cloud Lite",
+    "XGBoost",
+    "Scikit-learn",
+    "Streamlit"
+  ]
+}
